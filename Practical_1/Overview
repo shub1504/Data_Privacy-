@@ -1,0 +1,99 @@
+# 🔒 Practical 1 — Data Privacy Audit
+
+**Course:** Data Privacy (DSC)
+**Subject audited:** `talentbrainy.in`
+**Auditor:** Shub
+**Date:** August 2026
+
+![Status](https://img.shields.io/badge/status-completed-brightgreen)
+![Findings](https://img.shields.io/badge/findings-5-blue)
+![High](https://img.shields.io/badge/high-3-red)
+![Medium](https://img.shields.io/badge/medium-1-orange)
+![Low](https://img.shields.io/badge/low-1-yellow)
+
+---
+
+## 📑 Table of Contents
+
+1. [Objective](#1-objective)
+2. [What Personal Data the Site Handles](#2-what-personal-data-the-site-handles)
+3. [Methodology](#3-methodology)
+4. [Findings and Privacy Impact](#4-findings-and-privacy-impact)
+5. [Positive Observations](#5-positive-observations)
+6. [Recommendations](#6-recommendations-privacy-focused)
+7. [Reflection](#7-reflection)
+
+---
+
+## 1. Objective
+
+This practical applies a data privacy audit to a live website, `talentbrainy.in`, to identify potential vulnerabilities and risks in how the site collects, stores, and protects personal data. The audit was conducted with the organization's authorization as part of a security review, and the technical findings are analyzed here specifically through a **data privacy lens**, in line with the course's Practical 1 brief.
+
+---
+
+## 2. What Personal Data the Site Handles
+
+Based on the site's structure and functionality, `talentbrainy.in` collects and processes the following categories of personal data:
+
+- **Account / identity data** — name, email address, password (via login and "Join Free" signup)
+- **Student application data** — via `applications.php`, likely including academic details, project/internship preferences
+- **Certificates** — via `certificates.php` and `certificate-payment.php`, tying a person's identity to earned credentials and payment records
+- **Profile data** — via `profile.php`, likely including contact details and possibly resume/portfolio information
+- **Payment data** — processed via the PayU payment gateway integration (`payu_config.php`, `payu_links.php`)
+
+> Because the site handles identity, academic, and payment-related data together, it falls under a reasonably sensitive data privacy profile despite being a small, student-facing platform.
+
+---
+
+## 3. Methodology
+
+| Technique | Purpose |
+|---|---|
+| `dirb` directory/file enumeration | Map site structure, locate where personal data is likely processed or stored |
+| Manual inspection | Verify and interpret discovered paths and files |
+| [securityheaders.com](https://securityheaders.com) | Automated HTTP response header analysis |
+| Qualys SSL Labs | Automated TLS/SSL configuration analysis |
+| Nikto | Automated misconfiguration scan |
+
+> ℹ️ This was a review-level, unauthenticated audit — no personal data was actually extracted, viewed, or misused at any point.
+
+---
+
+## 4. Findings and Privacy Impact
+
+| # | Technical Finding | Privacy Impact | Severity |
+|---|---|---|:---:|
+| 1 | Directory listing enabled on `/includes/`, `/assets/`, `/student/` | Exposes the exact filenames of scripts that handle student applications, certificates, profiles, and payments (`db.php`, `payu_config.php`, `certificate-payment.php`). Doesn't leak personal data directly, but reveals precisely where it lives on the server. | 🔴 High |
+| 2 | Session cookie missing `HttpOnly` and `SameSite` attributes | Would make it easier for an attacker to hijack a logged-in student's session and access their personal data (applications, certificates, profile) if any script-injection issue existed elsewhere. | 🔴 High |
+| 3 | No HTTP→HTTPS redirect enforced; HSTS not configured | Personal data (login credentials, form submissions) could be transmitted unencrypted if a user reaches the site over plain HTTP before any redirect occurs. | 🔴 High |
+| 4 | Missing security headers (`CSP`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`) | Reduces browser-level protection against attacks (e.g. clickjacking, XSS) that could be used to manipulate a logged-in user into exposing their own data. | 🟠 Medium |
+| 5 | No DNS CAA record; OCSP stapling not enabled | Minor certificate-issuance hardening gap; low direct impact on personal data. | 🟡 Low |
+
+---
+
+## 5. Positive Observations
+
+- ✅ **TLS/SSL configuration is strong (Grade A)** — data in transit is well protected once HTTPS is used, with modern protocols and ciphers only.
+- ✅ **Student portal pages correctly enforce authentication** — `dashboard.php`, `profile.php`, `applications.php`, `certificates.php`, and `certificate-payment.php` all redirect unauthenticated visitors to login rather than exposing personal data directly.
+- ✅ **Server-level restrictions are correctly applied** to sensitive paths such as `error_log` and `cgi-bin`, preventing log-based data leakage.
+
+---
+
+## 6. Recommendations (Privacy-Focused)
+
+1. Disable directory listing (`Options -Indexes`) on all folders, especially `/includes/` and `/student/`, since these are where personal-data-handling scripts live.
+2. Add `HttpOnly`, `Secure`, and `SameSite` attributes to the session cookie to protect authenticated student sessions.
+3. Enforce HTTPS site-wide with a redirect and HSTS header to protect personal data in transit at every step.
+4. Add standard security headers to reduce the attack surface around any page that handles personal data.
+5. Publish a clear, accurate privacy policy describing what data is collected (application details, certificates, payment data) and how it is protected — none was observed during this audit, which is itself a gap worth addressing for a site handling payments and academic records.
+6. Conduct periodic privacy/security audits, especially before adding new data-collecting features (e.g. new application forms).
+
+---
+
+## 7. Reflection
+
+> This audit highlighted how closely security and privacy are linked in practice: several of the technical issues found (directory listing, missing headers, weak cookie flags) aren't primarily "privacy" bugs in the classical sense (like unclear consent or excessive data collection), but they directly determine how well a user's personal data is actually protected once it's collected. A site can have reasonable intentions around data use and still put that data at risk through basic infrastructure misconfigurations. This reinforced that a data privacy audit can't stop at reading a privacy policy — it has to also verify that the technical controls around the data match what the policy promises.
+
+---
+
+*This audit was conducted with authorization as part of a broader security review. Findings were also reported to the organization for remediation.*
